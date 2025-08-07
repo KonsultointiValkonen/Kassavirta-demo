@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kassavirta — selainprototyyppi</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --primary:#1E3A8A; /* tummansininen */
+      --accent:#10B981;  /* vihreä */
+      --warn:#F59E0B;    /* oranssi */
+      --danger:#EF4444;  /* punainen */
+      --muted:#6B7280;   /* harmaa */
+    }
+    body{ font-family: 'Inter',system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif; }
+    /* Mobile app-like bottom nav sticks to bottom */
+    .safe-bottom{ padding-bottom: env(safe-area-inset-bottom); }
+    .card{ @apply bg-white rounded-xl shadow; }
+    .btn{ @apply px-4 py-2 rounded-lg font-medium; }
+    .btn-primary{ @apply text-white; background:var(--primary); }
+    .btn-primary:hover{ filter:brightness(1.05); }
+    .btn-outline{ @apply border; border-color:rgb(229 231 235); }
+    .chip{ @apply inline-flex items-center px-2 py-0.5 rounded-full text-sm font-medium; }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex flex-col">
+  <!-- Header -->
+  <header class="bg-white/90 backdrop-blur sticky top-0 z-30 shadow-sm">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background:var(--primary)">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+            <polyline points="17 6 23 6 23 12"></polyline>
+          </svg>
+        </div>
+        <h1 class="text-xl md:text-2xl font-extrabold text-slate-900">Kassavirta</h1>
+        <span class="chip ml-2 bg-emerald-100 text-emerald-700">Prototyyppi</span>
+      </div>
+      <button id="resetDataBtn" class="btn btn-outline text-slate-700">Tyhjennä data</button>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="flex-1">
+    <!-- Hero / Dashboard -->
+    <section id="view-dashboard" class="max-w-5xl mx-auto px-4 pt-6 pb-28 md:pb-8">
+      <div class="text-center mb-6">
+        <span class="chip bg-emerald-100 text-emerald-700">Pienyrittäjille</span>
+        <h2 class="text-3xl md:text-5xl font-extrabold mt-3 text-slate-900 leading-tight">
+          Hallitse kassavirtaa <span class="block text-[color:var(--primary)]">vaivattomasti</span>
+        </h2>
+        <p class="text-slate-600 max-w-2xl mx-auto mt-3">Syötä alkusaldo, lisää tulot ja menot, määritä toistuvat erät ja katso 30 päivän ennuste.</p>
+      </div>
+
+      <!-- Balance + quick actions -->
+      <div class="grid md:grid-cols-3 gap-4">
+        <div class="card p-5 md:col-span-1">
+          <p class="text-sm text-slate-500">Nykyinen kokonaissaldo</p>
+          <div class="flex items-baseline gap-2 mt-1">
+            <span id="currentBalance" class="text-3xl font-extrabold">0,00 €</span>
+            <span id="balanceDelta" class="text-sm text-slate-500"></span>
+          </div>
+
+          <div class="mt-4">
+            <label for="initialBalance" class="block text-sm font-medium text-slate-700 mb-1">Alkusaldo</label>
+            <div class="flex gap-2">
+              <input id="initialBalance" type="number" step="0.01" class="w-full border rounded-lg px-3 py-2" placeholder="0.00" />
+              <button id="saveInitial" class="btn btn-primary">Tallenna</button>
+            </div>
+            <p class="text-xs text-slate-500 mt-1">Tallennetaan selaimen localStorageen.</p>
+          </div>
+
+          <div class="mt-6 grid grid-cols-2 gap-2">
+            <button class="btn btn-primary" onclick="openTransactionForm('income')">+ Lisää tulo</button>
+            <button class="btn btn-outline" onclick="openTransactionForm('expense')">+ Lisää meno</button>
+            <button class="btn btn-outline col-span-2" onclick="openRecurringForm()">⚙︎ Toistuva erä</button>
+          </div>
+        </div>
+
+        <div class="card p-5 md:col-span-2">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-semibold text-slate-900">Kassavirtaennuste (30 pv)</h3>
+            <div class="flex items-center gap-2">
+              <span id="lowCashWarning" class="hidden chip bg-amber-100 text-amber-800">Varoitus: matala kassataso</span>
+              <select id="horizon" class="border rounded-lg px-2 py-1 text-sm">
+                <option value="7">7 päivää</option>
+                <option value="30" selected>30 päivää</option>
+                <option value="90">90 päivää</option>
+              </select>
+            </div>
+          </div>
+          <div class="relative h-64 md:h-72"><canvas id="forecastChart" class="!h-full !w-full"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Recent transactions -->
+      <div class="card p-5 mt-4">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-semibold text-slate-900">Viimeisimmät tapahtumat</h3>
+          <button class="btn btn-outline text-sm" onclick="switchView('view-transactions')">Avaa tapahtumat</button>
+        </div>
+        <div class="overflow-auto">
+          <table class="w-full text-sm">
+            <thead class="text-slate-500">
+              <tr>
+                <th class="text-left py-2 pr-2">Pvm</th>
+                <th class="text-left py-2 pr-2">Kategoria</th>
+                <th class="text-left py-2 pr-2">Kuvaus</th>
+                <th class="text-right py-2 pl-2">Summa</th>
+              </tr>
+            </thead>
+            <tbody id="recentTxBody" class="align-top"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Transactions view -->
+    <section id="view-transactions" class="max-w-5xl mx-auto px-4 pt-6 pb-28 hidden">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-2xl font-bold">Tapahtumat</h2>
+        <div class="flex gap-2">
+          <button class="btn btn-primary" onclick="openTransactionForm('income')">+ Tulo</button>
+          <button class="btn btn-outline" onclick="openTransactionForm('expense')">+ Meno</button>
+        </div>
+      </div>
+
+      <div class="card p-4 mb-4">
+        <div class="grid md:grid-cols-5 gap-2">
+          <div>
+            <label class="text-sm">Tyyppi</label>
+            <select id="filterType" class="w-full border rounded-lg px-2 py-2">
+              <option value="">Kaikki</option>
+              <option value="income">Tulot</option>
+              <option value="expense">Menot</option>
+            </select>
+          </div>
+          <div class="md:col-span-2">
+            <label class="text-sm">Aikaväli</label>
+            <div class="flex gap-2">
+              <input type="date" id="filterFrom" class="w-full border rounded-lg px-2 py-2" />
+              <input type="date" id="filterTo" class="w-full border rounded-lg px-2 py-2" />
+            </div>
+          </div>
+          <div class="md:col-span-2">
+            <label class="text-sm">Kategoria</label>
+            <select id="filterCategory" class="w-full border rounded-lg px-2 py-2"></select>
+          </div>
+        </div>
+        <div class="mt-3">
+          <button class="btn btn-outline" onclick="applyFilters()">Suodata</button>
+          <button class="btn btn-outline" onclick="clearFilters()">Tyhjennä</button>
+        </div>
+      </div>
+
+      <div class="card p-4 overflow-auto">
+        <table class="w-full text-sm">
+          <thead class="text-slate-500">
+            <tr>
+              <th class="text-left py-2">Pvm</th>
+              <th class="text-left py-2">Tyyppi</th>
+              <th class="text-left py-2">Kategoria</th>
+              <th class="text-left py-2">Kuvaus</th>
+              <th class="text-right py-2">Summa</th>
+              <th class="text-right py-2">Toiminnot</th>
+            </tr>
+          </thead>
+          <tbody id="txTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Recurring view -->
+    <section id="view-recurring" class="max-w-5xl mx-auto px-4 pt-6 pb-28 hidden">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-2xl font-bold">Toistuvat tapahtumat</h2>
+        <button class="btn btn-primary" onclick="openRecurringForm()">+ Lisää</button>
+      </div>
+      <div class="card p-4 overflow-auto">
+        <table class="w-full text-sm">
+          <thead class="text-slate-500">
+            <tr>
+              <th class="text-left py-2">Nimi</th>
+              <th class="text-left py-2">Tyyppi</th>
+              <th class="text-left py-2">Kategoria</th>
+              <th class="text-left py-2">Summa</th>
+              <th class="text-left py-2">Toistuvuus</th>
+              <th class="text-left py-2">Seuraava</th>
+              <th class="text-right py-2">Toiminnot</th>
+            </tr>
+          </thead>
+          <tbody id="recurringTableBody"></tbody>
+        </table>
+      </div>
+      <p class="text-xs text-slate-500 mt-2">Huom. Käyttää selaimen kellonaikaa. Ei taustaprosesseja.</p>
+    </section>
+
+    <!-- Reports view -->
+    <section id="view-reports" class="max-w-5xl mx-auto px-4 pt-6 pb-28 hidden">
+      <h2 class="text-2xl font-bold mb-4">Raportit</h2>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="card p-4">
+          <h3 class="font-semibold mb-2">Kuukausiyhteenveto</h3>
+          <div class="relative h-64"><canvas id="monthlyBar" class="!h-full !w-full"></canvas></div>
+        </div>
+        <div class="card p-4">
+          <h3 class="font-semibold mb-2">Kategoriat (kulut)</h3>
+          <div class="relative h-64"><canvas id="expensePie" class="!h-full !w-full"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Settings view (minimal for static) -->
+    <section id="view-settings" class="max-w-5xl mx-auto px-4 pt-6 pb-28 hidden">
+      <h2 class="text-2xl font-bold mb-4">Asetukset</h2>
+      <div class="card p-4">
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <label class="text-sm">Kriittinen kassataso (€)</label>
+            <input id="criticalLevel" type="number" step="0.01" class="w-full border rounded-lg px-3 py-2 mt-1">
+            <p class="text-xs text-slate-500 mt-1">Varoitus näytetään, jos ennuste alittaa rajan.</p>
+          </div>
+          <div class="flex items-end">
+            <button class="btn btn-primary" onclick="saveSettings()">Tallenna</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Bottom navigation -->
+  <nav class="fixed bottom-0 inset-x-0 z-40 safe-bottom">
+    <div class="mx-auto max-w-5xl">
+      <div class="mx-4 mb-4 rounded-2xl shadow-lg bg-white">
+        <div class="grid grid-cols-5 text-center text-[13px]">
+          <button class="py-3 flex flex-col gap-1 text-slate-600 hover:text-slate-900" onclick="switchView('view-dashboard')">
+            <span>🏠</span><span>Etusivu</span>
+          </button>
+          <button class="py-3 flex flex-col gap-1 text-slate-600 hover:text-slate-900" onclick="switchView('view-transactions')">
+            <span>📒</span><span>Tapahtumat</span>
+          </button>
+          <button class="py-3 flex flex-col gap-1 text-slate-600 hover:text-slate-900" onclick="switchView('view-recurring')">
+            <span>🔁</span><span>Toistuvat</span>
+          </button>
+          <button class="py-3 flex flex-col gap-1 text-slate-600 hover:text-slate-900" onclick="switchView('view-reports')">
+            <span>📊</span><span>Raportit</span>
+          </button>
+          <button class="py-3 flex flex-col gap-1 text-slate-600 hover:text-slate-900" onclick="switchView('view-settings')">
+            <span>⚙️</span><span>Asetukset</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Transaction modal -->
+  <dialog id="txDialog" class="rounded-2xl w-11/12 max-w-lg">
+    <form method="dialog" class="p-0">
+      <div class="p-4 border-b flex items-center justify-between">
+        <h3 id="txDialogTitle" class="text-lg font-semibold">Lisää tapahtuma</h3>
+        <button class="text-slate-500" value="cancel">Sulje</button>
+      </div>
+      <div class="p-4 grid gap-3">
+        <input type="hidden" id="txId" />
+        <div>
+          <label class="text-sm">Tyyppi</label>
+          <select id="txType" class="w-full border rounded-lg px-3 py-2">
+            <option value="income">Tulo</option>
+            <option value="expense">Meno</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm">Summa (€)</label>
+          <input id="txAmount" type="number" step="0.01" class="w-full border rounded-lg px-3 py-2" required />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-sm">Päivämäärä</label>
+            <input id="txDate" type="date" class="w-full border rounded-lg px-3 py-2" required />
+          </div>
+          <div>
+            <label class="text-sm">Kategoria</label>
+            <select id="txCategory" class="w-full border rounded-lg px-3 py-2"></select>
+          </div>
+        </div>
+        <div>
+          <label class="text-sm">Kuvaus</label>
+          <input id="txDesc" type="text" class="w-full border rounded-lg px-3 py-2" placeholder="Vapaa kuvaus" />
+        </div>
+      </div>
+      <div class="p-4 border-t flex justify-end gap-2">
+        <button class="btn btn-outline" value="cancel">Peruuta</button>
+        <button class="btn btn-primary" value="default" onclick="saveTransaction(event)">Tallenna</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Recurring modal -->
+  <dialog id="recDialog" class="rounded-2xl w-11/12 max-w-lg">
+    <form method="dialog" class="p-0">
+      <div class="p-4 border-b flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Toistuva tapahtuma</h3>
+        <button class="text-slate-500" value="cancel">Sulje</button>
+      </div>
+      <div class="p-4 grid gap-3">
+        <input type="hidden" id="recId" />
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-sm">Tyyppi</label>
+            <select id="recType" class="w-full border rounded-lg px-3 py-2">
+              <option value="income">Tulo</option>
+              <option value="expense">Meno</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-sm">Summa (€)</label>
+            <input id="recAmount" type="number" step="0.01" class="w-full border rounded-lg px-3 py-2" required />
+          </div>
+        </div>
+        <div>
+          <label class="text-sm">Nimi</label>
+          <input id="recName" type="text" class="w-full border rounded-lg px-3 py-2" placeholder="Esim. Vuokra" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-sm">Kategoria</label>
+            <select id="recCategory" class="w-full border rounded-lg px-3 py-2"></select>
+          </div>
+          <div>
+            <label class="text-sm">Toistuvuus</label>
+            <select id="recFreq" class="w-full border rounded-lg px-3 py-2">
+              <option value="weekly">Viikoittain</option>
+              <option value="monthly" selected>Kuukausittain</option>
+              <option value="yearly">Vuosittain</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-sm">Aloituspäivä</label>
+            <input id="recStart" type="date" class="w-full border rounded-lg px-3 py-2" />
+          </div>
+          <div>
+            <label class="text-sm">Seuraava</label>
+            <input id="recNext" type="date" class="w-full border rounded-lg px-3 py-2" />
+          </div>
+        </div>
+        <div>
+          <label class="text-sm">Kuvaus</label>
+          <input id="recDesc" type="text" class="w-full border rounded-lg px-3 py-2" />
+        </div>
+      </div>
+      <div class="p-4 border-t flex justify-end gap-2">
+        <button class="btn btn-outline" value="cancel">Peruuta</button>
+        <button class="btn btn-primary" value="default" onclick="saveRecurring(event)">Tallenna</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    // ----------- Simple data layer (localStorage) -----------
+    const LS_KEY = 'kassavirta_state_v1';
+    const defaultCategories = [
+      { id:'sales',  name:'Myynti', type:'income' },
+      { id:'rent',   name:'Vuokra', type:'expense' },
+      { id:'salary', name:'Palkat', type:'expense' },
+      { id:'vat',    name:'ALV',    type:'expense' },
+      { id:'yel',    name:'YEL',    type:'expense' },
+      { id:'mkt',    name:'Markkinointi', type:'expense' },
+      { id:'other',  name:'Muu', type:'' },
+    ];
+
+    function loadState(){
+      const raw = localStorage.getItem(LS_KEY);
+      if(raw){
+        try { return JSON.parse(raw); } catch(e){ console.warn('Bad state', e); }
+      }
+      const today = new Date().toISOString().slice(0,10);
+      return {
+        initialBalance: 0,
+        criticalLevel: 0,
+        categories: defaultCategories,
+        transactions: [], // {id, type, amount, date, categoryId, desc}
+        recurring: [ // demo examples
+          { id: crypto.randomUUID(), name:'Vuokra', type:'expense', categoryId:'rent', amount:800, freq:'monthly', start: today, next: today, desc:'' },
+          { id: crypto.randomUUID(), name:'ALV', type:'expense', categoryId:'vat', amount:300, freq:'monthly', start: today, next: today, desc:'' },
+        ],
+      };
+    }
+    let state = loadState();
+    function saveState(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+
+    // ----------- Utilities -----------
+    const fmt = (n) => (n || 0).toLocaleString('fi-FI', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €';
+    const byDateAsc = (a,b)=> a.date.localeCompare(b.date);
+    const todayISO = ()=> new Date().toISOString().slice(0,10);
+    function addDays(dateISO, days){
+      const d = new Date(dateISO);
+      d.setDate(d.getDate()+days);
+      return d.toISOString().slice(0,10);
+    }
+    function endOfMonth(dateISO){
+      const d = new Date(dateISO);
+      return new Date(d.getFullYear(), d.getMonth()+1, 0).toISOString().slice(0,10);
+    }
+    function addMonths(dateISO, m){
+      const d = new Date(dateISO);
+      d.setMonth(d.getMonth()+m);
+      return d.toISOString().slice(0,10);
+    }
+    function addYears(dateISO, y){
+      const d = new Date(dateISO);
+      d.setFullYear(d.getFullYear()+y);
+      return d.toISOString().slice(0,10);
+    }
+
+    // ----------- Rendering helpers -----------
+    function switchView(id){
+      for(const el of document.querySelectorAll('main > section')) el.classList.add('hidden');
+      document.getElementById(id).classList.remove('hidden');
+      if(id==='view-dashboard'){ renderDashboard(); }
+      if(id==='view-transactions'){ renderTransactions(); }
+      if(id==='view-recurring'){ renderRecurring(); }
+      if(id==='view-reports'){ renderReports(); }
+      if(id==='view-settings'){ renderSettings(); }
+      window.scrollTo({top:0,behavior:'smooth'});
+    }
+
+    // Categories into selects
+    function hydrateCategorySelects(){
+      const opts = state.categories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+      for(const id of ['txCategory','recCategory','filterCategory']){
+        const el = document.getElementById(id);
+        if(!el) continue;
+        el.innerHTML = '<option value="">Kaikki</option>'+opts;
+      }
+    }
+
+    // ----------- Dashboard -----------
+    let forecastChart, monthlyBar, expensePie;
+
+    function computeCurrentBalance(){
+      let bal = state.initialBalance;
+      for(const tx of state.transactions){
+        bal += (tx.type==='income' ? 1 : -1) * Number(tx.amount || 0);
+      }
+      return bal;
+    }
+
+    function expandRecurring(horizonDays){
+      // Return generated instances (date, amount, type, categoryId, desc)
+      const today = todayISO();
+      const until = addDays(today, horizonDays);
+      const items = [];
+      for(const r of state.recurring){
+        let next = r.next || r.start || today;
+        let safety = 0;
+        while(next <= until && safety < 200){
+          items.push({ date: next, amount: r.amount, type: r.type, categoryId:r.categoryId, desc: r.name || r.desc || 'Toistuva' });
+          // advance
+          if(r.freq==='weekly') next = addDays(next, 7);
+          else if(r.freq==='monthly') next = addMonths(next, 1);
+          else if(r.freq==='yearly') next = addYears(next, 1);
+          else next = addMonths(next, 1);
+          safety++;
+        }
+      }
+      return items;
+    }
+
+    function buildForecast(days){
+      // Returns labels[], balances[]
+      const labels = [];
+      const values = [];
+      const today = todayISO();
+      let balStart = computeCurrentBalance();
+      // include only future-dated transactions for forecast progression
+      const futureTx = state.transactions.filter(tx => tx.date > today).slice().sort(byDateAsc);
+      const recurring = expandRecurring(days);
+
+      const allEvents = [...futureTx, ...recurring].sort(byDateAsc);
+
+      let cursor = 0;
+      for(let i=0;i<days;i++){
+        const date = addDays(today, i+1);
+        labels.push(date);
+        // apply all events for this date
+        while(cursor < allEvents.length && allEvents[cursor].date <= date){
+          const e = allEvents[cursor];
+          balStart += (e.type==='income' ? 1 : -1) * Number(e.amount||0);
+          cursor++;
+        }
+        values.push(balStart);
+      }
+      return { labels, values };
+    }
+
+    function renderDashboard(){
+      // balance
+      const cur = computeCurrentBalance();
+      document.getElementById('currentBalance').textContent = fmt(cur);
+      // delta vs critical
+      const crit = Number(state.criticalLevel||0);
+      const deltaEl = document.getElementById('balanceDelta');
+      deltaEl.textContent = crit ? `• kriittinen raja ${fmt(crit)}` : '';
+      document.getElementById('initialBalance').value = state.initialBalance ?? 0;
+
+      // forecast
+      const horizon = Number(document.getElementById('horizon').value || 30);
+      const {labels, values} = buildForecast(horizon);
+
+      if(forecastChart){ forecastChart.destroy(); }
+      const ctx = document.getElementById('forecastChart').getContext('2d');
+      forecastChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets:[{
+            label:'Saldo (ennuste)',
+            data: values,
+            fill: true,
+            borderWidth: 2,
+            tension: 0.25
+          }]
+        },
+        options:{animation:false,
+          responsive:true,
+          maintainAspectRatio:false,
+          plugins:{ legend:{display:false} },
+          scales:{
+            y:{ ticks:{ callback:(v)=> v.toLocaleString('fi-FI')+' €' } }
+          }
+        }
+      });
+
+      // low cash warning
+      const low = values.some(v => crit && v < crit);
+      document.getElementById('lowCashWarning').classList.toggle('hidden', !low);
+
+      // recent transactions (last 5)
+      const tbody = document.getElementById('recentTxBody');
+      const last = state.transactions.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
+      tbody.innerHTML = last.map(tx => `
+        <tr class="border-t">
+          <td class="py-2 pr-2">${tx.date}</td>
+          <td class="py-2 pr-2">${getCategoryName(tx.categoryId)}</td>
+          <td class="py-2 pr-2">${tx.desc || ''}</td>
+          <td class="py-2 pl-2 text-right ${tx.type==='income'?'text-emerald-700':'text-rose-700'}">
+            ${(tx.type==='income'?'+':'-')}${fmt(Math.abs(Number(tx.amount||0)))}
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    document.getElementById('horizon').addEventListener('change', renderDashboard);
+    document.getElementById('saveInitial').addEventListener('click', ()=>{
+      const v = Number(document.getElementById('initialBalance').value || 0);
+      state.initialBalance = v;
+      saveState(); renderDashboard();
+    });
+    document.getElementById('resetDataBtn').addEventListener('click', ()=>{
+      if(confirm('Tyhjennetäänkö sovelluksen paikallinen data?')){
+        localStorage.removeItem(LS_KEY);
+        state = loadState();
+        hydrateCategorySelects();
+        renderAll();
+      }
+    });
+
+    // ----------- Transactions -----------
+    function getCategoryName(id){
+      const c = state.categories.find(c=>c.id===id);
+      return c ? c.name : '';
+    }
+    function renderTransactions(list = null){
+      hydrateCategorySelects();
+      const rows = (list || state.transactions.slice().sort((a,b)=>b.date.localeCompare(a.date))).map(tx => `
+        <tr class="border-t">
+          <td class="py-2">${tx.date}</td>
+          <td class="py-2">${tx.type==='income'?'Tulo':'Meno'}</td>
+          <td class="py-2">${getCategoryName(tx.categoryId)}</td>
+          <td class="py-2">${tx.desc || ''}</td>
+          <td class="py-2 text-right ${tx.type==='income'?'text-emerald-700':'text-rose-700'}">
+            ${(tx.type==='income'?'+':'-')}${fmt(Math.abs(Number(tx.amount||0)))}
+          </td>
+          <td class="py-2 text-right">
+            <button class="text-slate-700 underline" onclick="editTransaction('${tx.id}')">Muokkaa</button>
+            <span class="mx-1">·</span>
+            <button class="text-rose-700 underline" onclick="deleteTransaction('${tx.id}')">Poista</button>
+          </td>
+        </tr>
+      `).join('');
+      document.getElementById('txTableBody').innerHTML = rows || '<tr><td colspan="6" class="py-4 text-center text-slate-500">Ei tapahtumia</td></tr>';
+    }
+    function openTransactionForm(type='income'){
+      const dlg = document.getElementById('txDialog');
+      document.getElementById('txDialogTitle').textContent = type==='income'?'Lisää tulo':'Lisää meno';
+      document.getElementById('txId').value = '';
+      document.getElementById('txType').value = type;
+      document.getElementById('txAmount').value = '';
+      document.getElementById('txDate').value = todayISO();
+      document.getElementById('txCategory').value = '';
+      document.getElementById('txDesc').value = '';
+      dlg.showModal();
+    }
+    function saveTransaction(ev){
+      ev.preventDefault();
+      const id = document.getElementById('txId').value || crypto.randomUUID();
+      const type = document.getElementById('txType').value;
+      const amount = Number(document.getElementById('txAmount').value||0);
+      const date = document.getElementById('txDate').value;
+      const categoryId = document.getElementById('txCategory').value || 'other';
+      const desc = document.getElementById('txDesc').value || '';
+      const existing = state.transactions.find(x=>x.id===id);
+      const data = { id, type, amount, date, categoryId, desc };
+      if(existing){ Object.assign(existing, data); } else { state.transactions.push(data); }
+      saveState();
+      document.getElementById('txDialog').close();
+      renderAll();
+    }
+    function editTransaction(id){
+      const tx = state.transactions.find(x=>x.id===id);
+      if(!tx) return;
+      document.getElementById('txId').value = tx.id;
+      document.getElementById('txType').value = tx.type;
+      document.getElementById('txAmount').value = tx.amount;
+      document.getElementById('txDate').value = tx.date;
+      document.getElementById('txCategory').value = tx.categoryId;
+      document.getElementById('txDesc').value = tx.desc || '';
+      document.getElementById('txDialogTitle').textContent = 'Muokkaa tapahtumaa';
+      document.getElementById('txDialog').showModal();
+    }
+    function deleteTransaction(id){
+      if(!confirm('Poistetaanko tapahtuma?')) return;
+      state.transactions = state.transactions.filter(x=>x.id!==id);
+      saveState(); renderAll();
+    }
+    function applyFilters(){
+      const t = document.getElementById('filterType').value;
+      const c = document.getElementById('filterCategory').value;
+      const f = document.getElementById('filterFrom').value;
+      const to = document.getElementById('filterTo').value;
+      let list = state.transactions.slice();
+      if(t) list = list.filter(x=>x.type===t);
+      if(c) list = list.filter(x=>x.categoryId===c);
+      if(f) list = list.filter(x=>x.date>=f);
+      if(to) list = list.filter(x=>x.date<=to);
+      list.sort((a,b)=>b.date.localeCompare(a.date));
+      renderTransactions(list);
+    }
+    function clearFilters(){
+      document.getElementById('filterType').value='';
+      document.getElementById('filterCategory').value='';
+      document.getElementById('filterFrom').value='';
+      document.getElementById('filterTo').value='';
+      renderTransactions();
+    }
+
+    // ----------- Recurring -----------
+    function renderRecurring(){
+      hydrateCategorySelects();
+      const tbody = document.getElementById('recurringTableBody');
+      tbody.innerHTML = state.recurring.map(r=>`
+        <tr class="border-t">
+          <td class="py-2">${r.name||''}</td>
+          <td class="py-2">${r.type==='income'?'Tulo':'Meno'}</td>
+          <td class="py-2">${getCategoryName(r.categoryId)}</td>
+          <td class="py-2">${fmt(Number(r.amount||0))}</td>
+          <td class="py-2">${r.freq}</td>
+          <td class="py-2">${r.next||''}</td>
+          <td class="py-2 text-right">
+            <button class="text-slate-700 underline" onclick="editRecurring('${r.id}')">Muokkaa</button>
+            <span class="mx-1">·</span>
+            <button class="text-rose-700 underline" onclick="deleteRecurring('${r.id}')">Poista</button>
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="7" class="py-4 text-center text-slate-500">Ei toistuvia tapahtumia</td></tr>';
+    }
+    function openRecurringForm(){
+      const dlg = document.getElementById('recDialog');
+      document.getElementById('recId').value = '';
+      document.getElementById('recType').value = 'expense';
+      document.getElementById('recAmount').value = '';
+      document.getElementById('recName').value = '';
+      document.getElementById('recCategory').value = '';
+      document.getElementById('recFreq').value = 'monthly';
+      document.getElementById('recStart').value = todayISO();
+      document.getElementById('recNext').value = todayISO();
+      document.getElementById('recDesc').value = '';
+      dlg.showModal();
+    }
+    function saveRecurring(ev){
+      ev.preventDefault();
+      const id = document.getElementById('recId').value || crypto.randomUUID();
+      const data = {
+        id,
+        type: document.getElementById('recType').value,
+        amount: Number(document.getElementById('recAmount').value||0),
+        name: document.getElementById('recName').value || '',
+        categoryId: document.getElementById('recCategory').value || 'other',
+        freq: document.getElementById('recFreq').value,
+        start: document.getElementById('recStart').value || todayISO(),
+        next: document.getElementById('recNext').value || todayISO(),
+        desc: document.getElementById('recDesc').value || ''
+      };
+      const existing = state.recurring.find(x=>x.id===id);
+      if(existing){ Object.assign(existing, data); } else { state.recurring.push(data); }
+      saveState();
+      document.getElementById('recDialog').close();
+      renderAll();
+    }
+    function editRecurring(id){
+      const r = state.recurring.find(x=>x.id===id);
+      if(!r) return;
+      document.getElementById('recId').value = r.id;
+      document.getElementById('recType').value = r.type;
+      document.getElementById('recAmount').value = r.amount;
+      document.getElementById('recName').value = r.name || '';
+      document.getElementById('recCategory').value = r.categoryId;
+      document.getElementById('recFreq').value = r.freq;
+      document.getElementById('recStart').value = r.start || todayISO();
+      document.getElementById('recNext').value = r.next || todayISO();
+      document.getElementById('recDesc').value = r.desc || '';
+      document.getElementById('recDialog').showModal();
+    }
+    function deleteRecurring(id){
+      if(!confirm('Poistetaanko toistuva tapahtuma?')) return;
+      state.recurring = state.recurring.filter(x=>x.id!==id);
+      saveState(); renderAll();
+    }
+
+    // ----------- Reports -----------
+    function calcMonthlySummary(){
+      // returns {labels:[YYYY-MM], income[], expense[]}
+      const map = new Map();
+      for(const tx of state.transactions){
+        const ym = tx.date.slice(0,7);
+        if(!map.has(ym)) map.set(ym, {income:0,expense:0});
+        map.get(ym)[tx.type] += Number(tx.amount||0);
+      }
+      const labels = Array.from(map.keys()).sort();
+      const income = labels.map(k=> map.get(k).income);
+      const expense = labels.map(k=> map.get(k).expense);
+      return {labels, income, expense};
+    }
+    function calcExpenseByCategory(){
+      const m = new Map();
+      for(const tx of state.transactions.filter(t=>t.type==='expense')){
+        const k = getCategoryName(tx.categoryId) || 'Muu';
+        m.set(k, (m.get(k)||0) + Number(tx.amount||0));
+      }
+      const labels = Array.from(m.keys());
+      const values = labels.map(k=>m.get(k));
+      return {labels, values};
+    }
+    function renderReports(){
+      // Monthly
+      const m = calcMonthlySummary();
+      const ctx1 = document.getElementById('monthlyBar').getContext('2d');
+      if(monthlyBar) monthlyBar.destroy();
+      monthlyBar = new Chart(ctx1, {
+        type:'bar',
+        data:{
+          labels: m.labels,
+          datasets:[
+            { label:'Tulot', data:m.income },
+            { label:'Menot', data:m.expense },
+          ]
+        },
+        options:{animation:false, responsive:true, maintainAspectRatio:false }
+      });
+      // Expenses pie
+      const e = calcExpenseByCategory();
+      const ctx2 = document.getElementById('expensePie').getContext('2d');
+      if(expensePie) expensePie.destroy();
+      expensePie = new Chart(ctx2, {
+        type:'pie',
+        data:{ labels:e.labels, datasets:[{ data:e.values }]},
+        options:{animation:false, responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}} }
+      });
+    }
+
+    // ----------- Settings -----------
+    function renderSettings(){
+      document.getElementById('criticalLevel').value = state.criticalLevel ?? 0;
+    }
+    function saveSettings(){
+      state.criticalLevel = Number(document.getElementById('criticalLevel').value||0);
+      saveState(); renderDashboard();
+      alert('Tallennettu.');
+    }
+
+    // ----------- Bootstrap -----------
+    function renderAll(){
+      renderDashboard();
+      renderTransactions();
+      renderRecurring();
+      hydrateCategorySelects();
+    }
+    window.addEventListener('load', ()=>{
+      hydrateCategorySelects();
+      renderAll();
+    });
+  </script>
+</body>
+</html>
