@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tekoälyn haltuunotto — Deeple</title>
+<style>
+:root {
+  --bg: #0d0f1a;
+  --bg2: #131627;
+  --bg3: #1a1e35;
+  --green: #00d4aa;
+  --green-dim: rgba(0,212,170,0.12);
+  --blue: #4a9eff;
+  --blue-dim: rgba(74,158,255,0.12);
+  --red: #e94560;
+  --red-dim: rgba(233,69,96,0.12);
+  --amber: #f5a623;
+  --amber-dim: rgba(245,166,35,0.12);
+  --text: #e8eaf0;
+  --muted: #8b90a8;
+  --border: rgba(255,255,255,0.08);
+  --card: rgba(255,255,255,0.04);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.65;
+  min-height: 100vh;
+}
+
+/* ── PROGRESS BAR ── */
+#progress {
+  position: fixed; top:0; left:0; height:3px;
+  background: linear-gradient(90deg, var(--green), var(--blue));
+  z-index:500; width:0; transition: width .1s linear;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed; top:0; left:0; right:0; z-index:400;
+  background: rgba(13,15,26,0.92);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 2rem;
+  height: 60px;
+  display: flex; align-items: center; gap: 2.5rem;
+}
+.nav-logo { font-weight:700; font-size:1rem; color: var(--green); white-space:nowrap; }
+nav ul { list-style:none; display:flex; gap:0.25rem; flex-wrap:wrap; }
+nav ul li a {
+  color: var(--muted); text-decoration:none;
+  font-size:0.82rem; padding: 0.35rem 0.65rem; border-radius:6px;
+  transition: color .15s, background .15s;
+}
+nav ul li a:hover { color:var(--green); background: var(--green-dim); }
+
+/* ── LAYOUT ── */
+.page { padding-top: 60px; }
+.section { max-width: 1100px; margin:0 auto; padding: 5rem 2rem; }
+.section-sm { max-width: 1100px; margin:0 auto; padding: 3.5rem 2rem; }
+.divider { border:none; border-top:1px solid var(--border); max-width:1100px; margin:0 auto; }
+
+/* ── TYPOGRAPHY ── */
+.label {
+  font-size:0.72rem; font-weight:700; letter-spacing:.15em;
+  text-transform:uppercase; color:var(--green); margin-bottom:.5rem;
+}
+h1 { font-size: clamp(2.2rem,5vw,3.8rem); font-weight:800; line-height:1.15; }
+h2 { font-size: clamp(1.6rem,3vw,2.4rem); font-weight:700; line-height:1.2; }
+h3 { font-size:1.15rem; font-weight:600; }
+h4 { font-size:0.85rem; font-weight:600; text-transform:uppercase; letter-spacing:.08em; }
+
+/* ── CARDS ── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.5rem;
+}
+.card-green { border-color: rgba(0,212,170,.3); background: var(--green-dim); }
+.card-blue  { border-color: rgba(74,158,255,.3); background: var(--blue-dim); }
+.card-red   { border-color: rgba(233,69,96,.3);  background: var(--red-dim); }
+.card-amber { border-color: rgba(245,166,35,.3); background: var(--amber-dim); }
+
+/* ── HERO ── */
+.hero {
+  min-height: calc(100vh - 60px);
+  display:flex; align-items:center;
+  background: radial-gradient(ellipse 60% 50% at 70% 50%, rgba(0,212,170,.06) 0%, transparent 70%);
+  padding: 4rem 2rem 3rem;
+  max-width:1100px; margin:0 auto;
+}
+.hero-inner { max-width:700px; }
+.hero-badge {
+  display:inline-flex; align-items:center; gap:.5rem;
+  background: var(--green-dim); border:1px solid rgba(0,212,170,.3);
+  color:var(--green); padding:.4rem 1rem; border-radius:100px;
+  font-size:.82rem; font-weight:500; margin-bottom:1.5rem;
+}
+.hero-badge span { width:6px; height:6px; background:var(--green); border-radius:50%; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.hero h1 { margin-bottom:1.25rem; }
+.hero h1 em { color:var(--green); font-style:normal; }
+.hero-lead {
+  font-size:1.15rem; color:var(--muted); margin-bottom:2rem; max-width:580px;
+}
+.hero-quote {
+  border-left:3px solid var(--red);
+  padding:.9rem 1.25rem;
+  background: var(--red-dim);
+  border-radius:0 10px 10px 0;
+  font-size:1.1rem; font-style:italic; color:var(--text);
+  margin-bottom:2.5rem;
+}
+.hero-stats {
+  display:grid; grid-template-columns:repeat(3,1fr); gap:1rem;
+}
+.stat {
+  background: var(--card); border:1px solid var(--border);
+  border-radius:12px; padding:1.1rem; text-align:center;
+}
+.stat .num { font-size:1.9rem; font-weight:800; color:var(--green); display:block; line-height:1.1; }
+.stat .lbl { font-size:.8rem; color:var(--muted); margin-top:.2rem; }
+
+/* ── THREE-WAY COMPARISON ── */
+.three-col { display:grid; grid-template-columns:repeat(3,1fr); gap:1.25rem; margin-top:2rem; }
+.cmp-card {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:16px; padding:1.5rem; position:relative;
+  transition: transform .2s, border-color .2s;
+}
+.cmp-card:hover { transform:translateY(-4px); }
+.cmp-card.hero-card { border-color:rgba(0,212,170,.4); background:var(--green-dim); }
+.cmp-card.hero-card::after {
+  content:'Deeple';
+  position:absolute; top:0; right:0;
+  background:var(--green); color:var(--bg); font-size:.65rem;
+  font-weight:800; padding:.2rem .75rem;
+  border-radius:0 16px 0 8px; letter-spacing:.05em;
+}
+.cmp-icon { font-size:2rem; margin-bottom:1rem; }
+.cmp-card h3 { margin-bottom:.5rem; }
+.cmp-card p { font-size:.88rem; color:var(--muted); }
+
+/* ── PILLAR GRID ── */
+.pillar-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1.25rem; margin-top:2rem; }
+.pillar {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:16px; padding:1.5rem;
+  transition: transform .2s, border-color .2s;
+}
+.pillar:hover { transform:translateY(-4px); border-color: var(--blue); }
+.pillar-n {
+  font-size:2.8rem; font-weight:900; color:var(--blue);
+  opacity:.25; line-height:1; margin-bottom:.4rem;
+}
+.pillar h3 { color:var(--blue); margin-bottom:.65rem; }
+.pillar p { font-size:.88rem; color:var(--muted); }
+
+/* ── TOOLS ── */
+.tools-grid { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-top:2rem; }
+.tool-card {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:16px; padding:1.75rem;
+}
+.tool-card h3 { color:var(--green); font-size:1.4rem; margin-bottom:1rem; }
+.tool-card p { font-size:.9rem; color:var(--muted); margin-bottom:.75rem; }
+.tool-card strong { color:var(--text); }
+
+/* hub-and-spoke */
+.hub-svg { display:block; margin:1.5rem auto 0; }
+
+/* ── LEARNING CYCLE ── */
+.cycle {
+  display:grid; grid-template-columns:repeat(4,1fr);
+  gap:0; margin-top:2rem; position:relative;
+}
+.cycle::after {
+  content:''; position:absolute;
+  top:2.5rem; left:12.5%; right:12.5%; height:2px;
+  background: linear-gradient(90deg, var(--green), var(--blue));
+  border-radius:2px; z-index:0;
+}
+.cycle-step {
+  display:flex; flex-direction:column; align-items:center;
+  text-align:center; padding:0 .75rem; position:relative; z-index:1;
+}
+.step-circle {
+  width:3rem; height:3rem; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-weight:800; font-size:1.1rem;
+  margin-bottom:1rem; flex-shrink:0;
+}
+.step-circle.s1 { background:var(--green-dim); border:2px solid var(--green); color:var(--green); }
+.step-circle.s2 { background:rgba(0,212,170,.18); border:2px solid var(--green); color:var(--green); }
+.step-circle.s3 { background:var(--blue-dim); border:2px solid var(--blue); color:var(--blue); }
+.step-circle.s4 { background:rgba(74,158,255,.2); border:2px solid var(--blue); color:var(--blue); }
+.cycle-step h3 { font-size:.95rem; margin-bottom:.4rem; }
+.cycle-step p { font-size:.8rem; color:var(--muted); }
+
+/* support track */
+.support-track {
+  margin-top:2rem; padding:1.5rem;
+  background:var(--blue-dim); border:1px solid rgba(74,158,255,.25);
+  border-radius:14px;
+}
+.support-track h3 { color:var(--blue); margin-bottom:.6rem; }
+.support-track p { font-size:.88rem; color:var(--muted); }
+.support-track strong { color:var(--text); }
+
+/* scale */
+.scale-grid { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-top:2rem; }
+.scale-card {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:16px; padding:1.5rem;
+}
+.scale-num { font-size:3rem; font-weight:900; line-height:1; margin-bottom:.4rem; }
+.scale-num.blue { color:var(--blue); }
+.scale-num.amber { color:var(--amber); }
+.scale-card h3 { margin-bottom:.5rem; }
+.scale-card p { font-size:.88rem; color:var(--muted); }
+.scale-note {
+  margin-top:1rem; padding:.85rem 1rem;
+  background:var(--card); border:1px solid var(--border);
+  border-radius:10px; font-size:.82rem; color:var(--muted);
+}
+
+/* ── TIMELINE ── */
+.timeline-tabs {
+  display:flex; gap:0; margin-top:2rem;
+  background:var(--card); border:1px solid var(--border);
+  border-radius:14px; overflow:hidden;
+}
+.tab-btn {
+  flex:1; padding:.85rem .5rem; text-align:center;
+  cursor:pointer; background:none; border:none;
+  border-right:1px solid var(--border); color:var(--muted);
+  font-family:inherit; font-size:.78rem; line-height:1.3;
+  transition: background .15s, color .15s;
+}
+.tab-btn:last-child { border-right:none; }
+.tab-btn:hover { background: rgba(255,255,255,.04); color:var(--text); }
+.tab-btn.active { background:var(--green-dim); color:var(--green); }
+.tab-btn .tab-n { font-size:1.1rem; font-weight:800; display:block; }
+
+.tab-panel { display:none; }
+.tab-panel.active { display:block; animation: fadeUp .3s ease; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+
+.panel-inner {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:0 0 16px 16px; padding:2rem;
+  border-top:none;
+}
+.panel-title { color:var(--green); font-size:1.4rem; font-weight:700; margin-bottom:1.5rem; }
+.panel-cols { display:grid; grid-template-columns:1fr 320px; gap:1.5rem; }
+
+.act-list { list-style:none; }
+.act-list li {
+  padding:.6rem 0 .6rem 1.2rem; position:relative;
+  font-size:.88rem; color:var(--muted);
+  border-bottom:1px solid var(--border);
+}
+.act-list li:last-child { border-bottom:none; }
+.act-list li::before { content:'▸'; position:absolute; left:0; color:var(--blue); }
+
+.output-box {
+  background:var(--green-dim); border:1px solid rgba(0,212,170,.2);
+  border-radius:12px; padding:1.25rem;
+}
+.output-box h4 { color:var(--green); margin-bottom:.75rem; }
+.out-list { list-style:none; }
+.out-list li {
+  padding:.4rem 0 .4rem 1.2rem; position:relative;
+  font-size:.85rem; color:var(--text);
+}
+.out-list li::before { content:'✓'; position:absolute; left:0; color:var(--green); font-size:.75rem; }
+
+/* ── MEASUREMENT ── */
+.metrics-grid { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-top:2rem; }
+.metric-card {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:16px; padding:1.5rem;
+}
+.metric-card.leading { border-color:rgba(0,212,170,.3); }
+.metric-card.lagging { border-color:rgba(74,158,255,.3); }
+.metric-tag {
+  display:inline-block; font-size:.68rem; font-weight:700;
+  letter-spacing:.1em; text-transform:uppercase;
+  padding:.25rem .65rem; border-radius:4px; margin-bottom:1rem;
+}
+.leading .metric-tag { background:var(--green-dim); color:var(--green); }
+.lagging .metric-tag { background:var(--blue-dim); color:var(--blue); }
+.metric-list { list-style:none; }
+.metric-list li {
+  padding:.5rem 0; border-bottom:1px solid var(--border);
+  font-size:.88rem; color:var(--muted);
+}
+.metric-list li:last-child { border-bottom:none; }
+
+/* 4 needs */
+.needs-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-top:2rem; }
+.need-card {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:14px; padding:1.25rem; text-align:center;
+  transition: transform .2s, border-color .2s;
+}
+.need-card:hover { transform:translateY(-4px); border-color:var(--green); }
+.need-icon { font-size:1.75rem; margin-bottom:.65rem; }
+.need-card h4 { font-size:.9rem; margin-bottom:.4rem; color:var(--text); text-transform:none; letter-spacing:0; }
+.need-card p { font-size:.8rem; color:var(--muted); }
+
+/* ── COMPARISON TABLE ── */
+.cmp-table { width:100%; border-collapse:collapse; margin-top:2rem; }
+.cmp-table th {
+  padding:.85rem 1rem; text-align:left;
+  color:var(--muted); font-size:.75rem; font-weight:600;
+  text-transform:uppercase; letter-spacing:.06em;
+  border-bottom:1px solid var(--border);
+}
+.cmp-table td {
+  padding:.9rem 1rem; font-size:.88rem;
+  border-bottom:1px solid var(--border);
+}
+.cmp-table tr:last-child td { border-bottom:none; }
+.cmp-table td:first-child { color:var(--muted); width:28%; }
+.cmp-table .vs { color:var(--muted); }
+.cmp-table .win { color:var(--green); font-weight:500; }
+
+/* ── FOOTER ── */
+.footer {
+  text-align:center; padding:2rem;
+  color:var(--muted); font-size:.8rem;
+  border-top:1px solid var(--border);
+}
+
+/* ── RESPONSIVE ── */
+@media(max-width:900px) {
+  .three-col, .pillar-grid { grid-template-columns:1fr; }
+  .tools-grid, .scale-grid, .metrics-grid { grid-template-columns:1fr; }
+  .cycle { grid-template-columns:1fr 1fr; gap:1rem; }
+  .cycle::after { display:none; }
+  .needs-grid { grid-template-columns:1fr 1fr; }
+  .panel-cols { grid-template-columns:1fr; }
+  .hero-stats { grid-template-columns:repeat(3,1fr); }
+}
+@media(max-width:600px) {
+  .three-col { grid-template-columns:1fr; }
+  .needs-grid { grid-template-columns:1fr 1fr; }
+  .hero-stats { grid-template-columns:1fr 1fr 1fr; gap:.5rem; }
+  .tab-btn { font-size:.7rem; padding:.7rem .25rem; }
+  .hero-badge { font-size:.75rem; }
+}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<nav>
+  <span class="nav-logo">Deeple</span>
+  <ul>
+    <li><a href="#ydin">Ydin</a></li>
+    <li><a href="#perusta">Perusta</a></li>
+    <li><a href="#tyokalut">Työkalut</a></li>
+    <li><a href="#kyvykkyys">Kyvykkyys</a></li>
+    <li><a href="#aikataulu">Aikataulu</a></li>
+    <li><a href="#mittaus">Mittaus</a></li>
+    <li><a href="#erottuva">Miksi erilainen</a></li>
+  </ul>
+</nav>
+
+<div class="page">
+
+<!-- ═══════════════════════════════════════
+     HERO
+═══════════════════════════════════════ -->
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><span></span> Viiden kuukauden ohjelma</div>
+    <h1>Tekoälyn<br><em>haltuunotto</em></h1>
+    <p class="hero-lead">
+      Ohjelma, joka rakentaa organisaatiolle kyvyn johtaa
+      työn uudelleenmuotoilua itse — uudelleen ja uudelleen.
+    </p>
+    <div class="hero-quote">"Tekijä lähtee, kyky jää."</div>
+    <div class="hero-stats">
+      <div class="stat">
+        <span class="num">5</span>
+        <div class="lbl">kuukautta</div>
+      </div>
+      <div class="stat">
+        <span class="num">10–50</span>
+        <div class="lbl">esihenkilöä</div>
+      </div>
+      <div class="stat">
+        <span class="num">2–3</span>
+        <div class="lbl">sovellus­kierrosta</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════
+     YDIN — kolme lähestymistapaa
+═══════════════════════════════════════ -->
+<section class="section" id="ydin">
+  <div class="label">Ohjelman ydin</div>
+  <h2>Ei koulutusta. Ei konsultointia.<br>Kyvykkyyttä.</h2>
+  <p style="color:var(--muted);margin-top:1rem;max-width:620px;">
+    Deeple ei muotoile työtä asiakkaan puolesta eikä aja yhtään erillistä kokeilua.
+    Tulos ei ole projekti — se on pysyvä, vaikeakopioitava kyvykkyys.
+  </p>
+
+  <div class="three-col">
+    <div class="cmp-card">
+      <div class="cmp-icon">📚</div>
+      <h3>Kouluttaja</h3>
+      <p>Opettaa käyttämään työkalua. Organisaatio oppii promptaamaan, mutta ei johda muutosta itse.</p>
+    </div>
+    <div class="cmp-card">
+      <div class="cmp-icon">🔧</div>
+      <h3>Konsultti</h3>
+      <p>Tekee työn asiakkaan puolesta. Tuloksia syntyy, mutta riippuvuus ulkopuolisesta säilyy.</p>
+    </div>
+    <div class="cmp-card hero-card">
+      <div class="cmp-icon">🏗️</div>
+      <h3>Kyvykkyys</h3>
+      <p>Rakennetaan organisaation oma kyky muotoilla työtä. Vaikea kopioida, korkean katteen työtä. Malli monistuu sisältä käsin.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════
+     PERUSTA
+═══════════════════════════════════════ -->
+<section class="section" id="perusta">
+  <div class="label">Perusta</div>
+  <h2>Kolme pilaria, joiden päälle kaikki rakentuu</h2>
+  <p style="color:var(--muted);margin-top:1rem;max-width:640px;">
+    Ohjelma alkaa johdon linjauksista. Jos perusta ei ole kunnossa,
+    esihenkilöiden kyvykkyys ja hallintamalli rakentuvat tyhjän päälle.
+  </p>
+
+  <div class="pillar-grid">
+    <div class="pillar">
+      <div class="pillar-n">01</div>
+      <h3>Tilannekuva</h3>
+      <p>Mitä organisaatiossa jo tehdään, missä tekoälyä käytetään ja miten hajanaisesti, mihin osaaminen riittää. Hajanainen kootaan yhteen.</p>
+    </div>
+    <div class="pillar">
+      <div class="pillar-n">02</div>
+      <h3>Johdon yhteinen ymmärrys</h3>
+      <p>Johtoryhmä muodostaa jaetun käsityksen siitä, mihin tekoälyllä pyritään. Ratkaisee vaihtelevaan sitoutumisen. Johdon omistajuus on vahvin onnistumisen ennustaja — lukitaan tässä.</p>
+    </div>
+    <div class="pillar">
+      <div class="pillar-n">03</div>
+      <h3>Strategiaan sidottu suunta</h3>
+      <p>Suunta ei ole irrallinen tekoälytavoite vaan kytketty organisaation strategiaan. Antaa esihenkilöille ja hallintamallille kriteerin, jota vasten valintoja tehdään.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════
+     TYÖKALUT
+═══════════════════════════════════════ -->
+<section class="section" id="tyokalut">
+  <div class="label">Deeplen tuomat työkalut</div>
+  <h2>Malli + Hallintamalli</h2>
+
+  <div class="tools-grid">
+    <div class="tool-card">
+      <h3>Malli</h3>
+      <p>Konkreettinen tapa tehdä työn uudelleenmuotoilu. Vaiheet, kysymykset ja työkalut, jotka esihenkilö ottaa käteensä.</p>
+      <p>Malli tekee uudelleenmuotoilusta <strong>toistettavan menetelmän</strong>, ei intuition varassa olevan kertasuorituksen.</p>
+    </div>
+    <div class="tool-card">
+      <h3>Hallintamalli</h3>
+      <p><strong>Hub-and-spoke:</strong> keskitetty napa asettaa standardit ja riskienhallinnan, toimialojen puolat omistavat toteutuksen.</p>
+      <p>Jäsennetty seula ohjaa ideat arvon ja riskin mukaan — ei sen mukaan kuka huutaa kovimmin.</p>
+
+      <!-- Hub-and-spoke SVG -->
+      <svg class="hub-svg" width="220" height="220" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+        <!-- spokes -->
+        <line x1="110" y1="110" x2="110" y2="24"  stroke="rgba(0,212,170,.35)" stroke-width="1.5" stroke-dasharray="5,3"/>
+        <line x1="110" y1="110" x2="186" y2="57"  stroke="rgba(0,212,170,.35)" stroke-width="1.5" stroke-dasharray="5,3"/>
+        <line x1="110" y1="110" x2="192" y2="148" stroke="rgba(0,212,170,.35)" stroke-width="1.5" stroke-dasharray="5,3"/>
+        <line x1="110" y1="110" x2="110" y2="196" stroke="rgba(0,212,170,.35)" stroke-width="1.5" stroke-dasharray="5,3"/>
+        <line x1="110" y1="110" x2="28"  y2="148" stroke="rgba(0,212,170,.35)" stroke-width="1.5" stroke-dasharray="5,3"/>
+        <line x1="110" y1="110" x2="34"  y2="57"  stroke="rgba(0,212,170,.35)" stroke-width="1.5" stroke-dasharray="5,3"/>
+        <!-- spoke nodes -->
+        <circle cx="110" cy="24"  r="16" fill="rgba(74,158,255,.12)" stroke="#4a9eff" stroke-width="1.5"/>
+        <circle cx="186" cy="57"  r="16" fill="rgba(74,158,255,.12)" stroke="#4a9eff" stroke-width="1.5"/>
+        <circle cx="192" cy="148" r="16" fill="rgba(74,158,255,.12)" stroke="#4a9eff" stroke-width="1.5"/>
+        <circle cx="110" cy="196" r="16" fill="rgba(74,158,255,.12)" stroke="#4a9eff" stroke-width="1.5"/>
+        <circle cx="28"  cy="148" r="16" fill="rgba(74,158,255,.12)" stroke="#4a9eff" stroke-width="1.5"/>
+        <circle cx="34"  cy="57"  r="16" fill="rgba(74,158,255,.12)" stroke="#4a9eff" stroke-width="1.5"/>
+        <!-- spoke labels -->
+        <text x="110" y="9"   text-anchor="middle" fill="#4a9eff" font-size="7.5" font-family="system-ui">Toimiala</text>
+        <text x="197" y="43" text-anchor="middle" fill="#4a9eff" font-size="7.5" font-family="system-ui">Toimiala</text>
+        <text x="205" y="160" text-anchor="middle" fill="#4a9eff" font-size="7.5" font-family="system-ui">Toimiala</text>
+        <text x="110" y="218" text-anchor="middle" fill="#4a9eff" font-size="7.5" font-family="system-ui">Toimiala</text>
+        <text x="13"  y="160" text-anchor="middle" fill="#4a9eff" font-size="7.5" font-family="system-ui">Toimiala</text>
+        <text x="20"  y="43" text-anchor="middle" fill="#4a9eff" font-size="7.5" font-family="system-ui">Toimiala</text>
+        <!-- hub -->
+        <circle cx="110" cy="110" r="32" fill="rgba(0,212,170,.12)" stroke="#00d4aa" stroke-width="2"/>
+        <text x="110" y="107" text-anchor="middle" fill="#00d4aa" font-size="9" font-weight="700" font-family="system-ui">NAPA</text>
+        <text x="110" y="119" text-anchor="middle" fill="rgba(0,212,170,.7)" font-size="7.5" font-family="system-ui">Standardit</text>
+        <text x="110" y="129" text-anchor="middle" fill="rgba(0,212,170,.7)" font-size="7.5" font-family="system-ui">&amp; riskit</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════
+     KYVYKKYYS
+═══════════════════════════════════════ -->
+<section class="section" id="kyvykkyys">
+  <div class="label">Selkäranka</div>
+  <h2>Esihenkilöiden kyvykkyys</h2>
+  <p style="color:var(--muted);margin-top:1rem;margin-bottom:2.5rem;max-width:640px;">
+    Kyvykkyys syntyy toistosta, ei yhdestä työpajasta. Esihenkilöt soveltavat
+    mallia omaan oikeaan työhönsä — ei erillisessä kokeilussa vaan oikeassa arjessa.
+    Harjoittelun tuotos on samalla konkreettinen hallintateko: hajanaisesta tulee ohjattua.
+  </p>
+
+  <div class="cycle">
+    <div class="cycle-step">
+      <div class="step-circle s1">1</div>
+      <h3>Malli opetetaan</h3>
+      <p>Esihenkilöt oppivat työn uudelleenmuotoilun menetelmän</p>
+    </div>
+    <div class="cycle-step">
+      <div class="step-circle s2">2</div>
+      <h3>Ohjattu soveltaminen</h3>
+      <p>Sovelletaan omaan työhön Deeplen tuella</p>
+    </div>
+    <div class="cycle-step">
+      <div class="step-circle s3">3</div>
+      <h3>Vähemmällä tuella</h3>
+      <p>Sama toistetaan itsenäisemmin</p>
+    </div>
+    <div class="cycle-step">
+      <div class="step-circle s4">4</div>
+      <h3>Itsenäinen osaaminen</h3>
+      <p>Esihenkilö osaa tehdä sen yksin</p>
+    </div>
+  </div>
+
+  <div class="support-track">
+    <h3>Rinnakkainen raide: laaja valmennus</h3>
+    <p>
+      Kulkee koko ohjelman rinnalla osaamisen pohjana. Ei promptauskurssi —
+      vaan uudelleenmuotoilun ajattelun ja vastuullisen arkikäytön valmennus.
+      Kytketty <strong>EU:n tekoälyasetuksen artiklan 4 lukutaitovaatimukseen</strong>,
+      joka on jo voimassa. Ilman tätä pohjaa esihenkilön muotoilema työtapa
+      ei toteudu kentällä.
+    </p>
+  </div>
+
+  <div style="margin-top:3rem;">
+    <h3 style="color:var(--muted);font-size:1rem;font-weight:400;margin-bottom:1rem;">
+      Toteutusmalli esihenkilöiden määrän mukaan
+    </h3>
+    <div class="scale-grid">
+      <div class="scale-card">
+        <div class="scale-num blue">~10</div>
+        <h3>Tiivis pienryhmä</h3>
+        <p>Soveltamista voi ohjata lähes yksilötasolla. Deeple ehtii tukea jokaista kierroksen aikana.</p>
+      </div>
+      <div class="scale-card">
+        <div class="scale-num amber">~50</div>
+        <h3>Kohorttimalli</h3>
+        <p>Esihenkilöt jaetaan kohortteihin, vertaisoppiminen, sisäiset monistajat. Malli monistuu organisaation sisällä — ei jää Deeplen varaan. Tämä on kyvykkyystuotteen vahvuus.</p>
+      </div>
+    </div>
+    <div class="scale-note">
+      ⚖️ Rajapyykki noin <strong style="color:var(--text)">30 esihenkilöä</strong>:
+      sen alle 1–2 kohorttia tiiviillä ohjauksella,
+      sen yli kohorttimalli + sisäiset monistajat.
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════
+     AIKATAULU
+═══════════════════════════════════════ -->
+<section class="section" id="aikataulu">
+  <div class="label">Kuukausittainen kulku</div>
+  <h2>5 kuukautta — vaiheittain</h2>
+
+  <div class="timeline-tabs" role="tablist">
+    <button class="tab-btn active" role="tab" onclick="showTab(1)" data-tab="1">
+      <span class="tab-n">K1</span>Johdon perusta &amp; käynnistys
+    </button>
+    <button class="tab-btn" role="tab" onclick="showTab(2)" data-tab="2">
+      <span class="tab-n">K2</span>Malli haltuun
+    </button>
+    <button class="tab-btn" role="tab" onclick="showTab(3)" data-tab="3">
+      <span class="tab-n">K3</span>Sovelluskierros 1
+    </button>
+    <button class="tab-btn" role="tab" onclick="showTab(4)" data-tab="4">
+      <span class="tab-n">K4</span>Kierros 2 &amp; itsenäistyminen
+    </button>
+    <button class="tab-btn" role="tab" onclick="showTab(5)" data-tab="5">
+      <span class="tab-n">K5</span>Itsenäisyys &amp; jatko
+    </button>
+  </div>
+
+  <div id="tab-1" class="tab-panel active">
+    <div class="panel-inner">
+      <div class="panel-title">Kuukausi 1 — Johdon perusta ja käynnistys</div>
+      <div class="panel-cols">
+        <ul class="act-list">
+          <li>Johdon linjaukset: tilannekuva, johdon yhteinen ymmärrys ja strategiaan sidottu suunta</li>
+          <li>Henkilöstökysely lähtötasona: käyttöaste, osaaminen, asenne ja luottamus</li>
+          <li>Hallintamallin rakentaminen alkaa</li>
+          <li>Laaja valmennus käynnistyy</li>
+        </ul>
+        <div class="output-box">
+          <h4>Tuotokset</h4>
+          <ul class="out-list">
+            <li>Johdon linjaukset</li>
+            <li>Lähtötason mittaus</li>
+            <li>Hallintamallin runko</li>
+            <li>Käynnissä oleva valmennus</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-2" class="tab-panel">
+    <div class="panel-inner">
+      <div class="panel-title">Kuukausi 2 — Malli haltuun</div>
+      <div class="panel-cols">
+        <ul class="act-list">
+          <li>Esihenkilöt oppivat mallin</li>
+          <li>Hallintamalli rakentuu: roolit ja seula</li>
+          <li>Ensimmäinen sovelluskierros valmistellaan</li>
+          <li>Kukin esihenkilö valitsee oman työnsä kohteen</li>
+        </ul>
+        <div class="output-box">
+          <h4>Tuotokset</h4>
+          <ul class="out-list">
+            <li>Esihenkilöt hallitsevat mallin perusteet</li>
+            <li>Hallintamallin roolit ja seula</li>
+            <li>Valitut soveltamiskohteet</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-3" class="tab-panel">
+    <div class="panel-inner">
+      <div class="panel-title">Kuukausi 3 — Sovelluskierros 1 ohjattuna</div>
+      <div class="panel-cols">
+        <ul class="act-list">
+          <li>Esihenkilöt soveltavat mallia omaan työhönsä Deeplen tuella</li>
+          <li>Seula otetaan käyttöön</li>
+          <li>Muotoillut työtavat kulkevat hallintamallin läpi</li>
+          <li>Ensimmäiset johtavat mittarit: käyttö ja luottamus</li>
+        </ul>
+        <div class="output-box">
+          <h4>Tuotokset</h4>
+          <ul class="out-list">
+            <li>Ensimmäiset ohjatusti muotoillut työtavat</li>
+            <li>Hallintamalli käytössä</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-4" class="tab-panel">
+    <div class="panel-inner">
+      <div class="panel-title">Kuukausi 4 — Sovelluskierros 2 ja itsenäistyminen</div>
+      <div class="panel-cols">
+        <ul class="act-list">
+          <li>Toinen sovelluskierros vähemmällä tuella</li>
+          <li>Esihenkilöt alkavat toimia hallintamallin puolina omilla toimialoillaan</li>
+          <li>Laaja valmennus syventää arviointikykyä</li>
+        </ul>
+        <div class="output-box">
+          <h4>Tuotokset</h4>
+          <ul class="out-list">
+            <li>Toinen muotoiltu työtapa esihenkilöä kohden</li>
+            <li>Esihenkilöt hallintamallin osana</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-5" class="tab-panel">
+    <div class="panel-inner">
+      <div class="panel-title">Kuukausi 5 — Itsenäisyys, mittaus ja jatko</div>
+      <div class="panel-cols">
+        <ul class="act-list">
+          <li>Esihenkilöt soveltavat mallia itsenäisesti</li>
+          <li>Loppumittaus: kyvykkyyden ja hallinnan kypsyys</li>
+          <li>Henkilöstökysely: ennen ja jälkeen</li>
+          <li>Tiekartta seuraaville 12–18 kuukaudelle</li>
+          <li>Osaamisen ylläpidon suunnitelma</li>
+        </ul>
+        <div class="output-box">
+          <h4>Tuotokset</h4>
+          <ul class="out-list">
+            <li>Kypsyysarvio</li>
+            <li>Vaikuttavuusraportti</li>
+            <li>Tiekartta 12–18 kk</li>
+            <li>Ylläpitosuunnitelma</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════
+     MITTAUS
+═══════════════════════════════════════ -->
+<section class="section" id="mittaus">
+  <div class="label">Mittaus</div>
+  <h2>Kyvykkyyden ja hallinnan kypsyys</h2>
+  <p style="color:var(--muted);margin-top:1rem;max-width:640px;">
+    Näyttö ei ole yhden työnkulun ennen ja jälkeen. Se on kyvykkyyden ja hallinnan kypsyys.
+  </p>
+
+  <div class="metrics-grid">
+    <div class="metric-card leading">
+      <span class="metric-tag">Johtavat mittarit — liikkuvat ensin</span>
+      <h3 style="margin-bottom:1rem;">Käyttö ja luottamus</h3>
+      <ul class="metric-list">
+        <li>Montako esihenkilöä osaa mallin itsenäisesti</li>
+        <li>Montako todellista työtapaa he muotoilivat omaan työhönsä</li>
+        <li>Miten käyttö ja luottamus liikkuivat henkilöstökyselyssä lähtötasoon verrattuna</li>
+      </ul>
+    </div>
+    <div class="metric-card lagging">
+      <span class="metric-tag">Jälkijättöiset mittarit — vahvistavat tuloksen</span>
+      <h3 style="margin-bottom:1rem;">Aikasäästö ja laatu</h3>
+      <ul class="metric-list">
+        <li>Aikasäästö esihenkilöiden muotoilemissa työtavoissa</li>
+        <li>Laadun paraneminen muotoilluissa prosesseissa</li>
+      </ul>
+    </div>
+  </div>
+
+  <div style="margin-top:3rem;">
+    <h3 style="margin-bottom:1.25rem;">Ohjelma vastaa asiakkaan neljään toiveeseen</h3>
+    <div class="needs-grid">
+      <div class="need-card">
+        <div class="need-icon">🧭</div>
+        <h4>Selkeä suunta</h4>
+        <p>Tulee johdon linjauksista</p>
+      </div>
+      <div class="need-card">
+        <div class="need-icon">🔭</div>
+        <h4>Näkymä kokonaisuuteen</h4>
+        <p>Tulee hallintamallista</p>
+      </div>
+      <div class="need-card">
+        <div class="need-icon">💪</div>
+        <h4>Kyky johtaa</h4>
+        <p>Tulee mallista ja ohjatusta soveltamisesta</p>
+      </div>
+      <div class="need-card">
+        <div class="need-icon">🛡️</div>
+        <h4>Riskit hallussa</h4>
+        <p>Tulee hallintamallin seulasta</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════
+     MIKSI ERILAINEN
+═══════════════════════════════════════ -->
+<section class="section" id="erottuva">
+  <div class="label">Yhteenveto</div>
+  <h2>Miksi tämä ei ole<br>hallinta plus koulutus -paketti</h2>
+  <p style="color:var(--muted);margin-top:1rem;max-width:660px;">
+    Kilpailija myy hallintamallin ja koulutuksen — organisaatio osaa käyttää
+    työkalua ja tietää säännöt. Tässä organisaatio osaa muotoilla työtään
+    tekoälyn avulla ja johtaa sitä itse. Ero on kyvykkyydessä, joka jää
+    organisaatioon ja monistuu sen sisällä.
+  </p>
+
+  <table class="cmp-table">
+    <thead>
+      <tr>
+        <th>Ulottuvuus</th>
+        <th>Hallinta + koulutus -paketti</th>
+        <th style="color:var(--green)">Deeple / Kyvykkyys</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Lopputulos</td>
+        <td class="vs">Osaa käyttää ja tietää säännöt</td>
+        <td class="win">Osaa muotoilla työtä ja johtaa itse</td>
+      </tr>
+      <tr>
+        <td>Kyvykkyys</td>
+        <td class="vs">Jää ulkopuoliselle</td>
+        <td class="win">Jää organisaatioon, monistuu sisällä</td>
+      </tr>
+      <tr>
+        <td>Kopioitavuus</td>
+        <td class="vs">Helppo kopioida</td>
+        <td class="win">Selvästi vaikeampi kopioida</td>
+      </tr>
+      <tr>
+        <td>Riippuvuus</td>
+        <td class="vs">Jatkuva tarve ulkopuoliselle</td>
+        <td class="win">Tekijä lähtee, kyky jää</td>
+      </tr>
+      <tr>
+        <td>Kate</td>
+        <td class="vs">Matala</td>
+        <td class="win">Korkeampi</td>
+      </tr>
+      <tr>
+        <td>Skaalautuminen</td>
+        <td class="vs">Vaatii lisää koulutusta</td>
+        <td class="win">Monistuu sisäisesti esihenkilöltä toiselle</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<div class="footer">
+  Deeple &mdash; Tekoälyn haltuunotto &mdash; Prosessikuvaus
+</div>
+
+</div><!-- /page -->
+
+<script>
+// Progress bar
+window.addEventListener('scroll', () => {
+  const s = window.scrollY;
+  const h = document.documentElement.scrollHeight - window.innerHeight;
+  document.getElementById('progress').style.width = (s / h * 100) + '%';
+});
+
+// Timeline tabs
+function showTab(n) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + n).classList.add('active');
+  document.querySelector('[data-tab="' + n + '"]').classList.add('active');
+}
+
+// Smooth nav scroll
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    const t = document.querySelector(a.getAttribute('href'));
+    if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+});
+</script>
+</body>
+</html>
